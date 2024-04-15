@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres-otus-db:
+    image: bitnami/postgresql:14
+    shm_size: 1g
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - ./01-schema-init.sql:/docker-entrypoint-initdb.d/01-schema-init.sql
+      - ./02-data-init.sql:/docker-entrypoint-initdb.d/02-data-init.sql
+
+  redis-otus:
+    image: redis:6
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis/data:/data
+
+  otus-highload-hw4:
+    image: recvezitor/otus-highload-hw4:latest
+    depends_on:
+      - postgres-otus-db, redis-otus
+    ports:
+      - "8080:8080"
+    environment:
+      JAVA_OPTS_ADD: -XX:MinRAMPercentage=25 -XX:MaxRAMPercentage=50 -XX:+PrintFlagsFinal
+      DB_URL: postgresql://postgres-otus-db:5432/postgres
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_POOL_SIZE: 100
+      DB_POOL_IDLE_TIME: PT30s
+      DB_POOL_MAX_TIME: PT60s
+      REDIS_HOST: redis://redis-otus:6379
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: "1024M"
+        reservations:
+          cpus: "0.5"
+          memory: "256M"
